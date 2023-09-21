@@ -1,0 +1,82 @@
+version: "3.9"
+
+services:
+  os-app-svc-dc:
+    container_name: os-app-svc-dc
+    image: os-app-img
+    build: .
+    depends_on:
+      - mongo
+    ports:
+      - "3000:3000"
+    networks:
+      - os-frontend-net-dc
+      - os-backend-net-dc
+    environment:
+      - os-app-img_DB_HOST=mongo
+      - os-app-img_DB_USER=username
+      - os-app-img_DB_PASSWORD=password
+      - os-app-img_DB_NAME=shopdata
+    volumes:
+      - appdata:/var/www/html
+    restart: always
+
+  mongo:
+    container_name: mongo
+    image: mongo
+    volumes:
+      - mongodata:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - os-backend-net-dc
+    environment:
+      - MONGODB_DATABASE=shopdata #:${MONGO_DEFAULT_DATABASE}
+      - MONGODB_USER=username #: ${MONGO_USER}
+      - MONGODB_PASSWORD=password #: {MONGO_PASSWORD}
+
+  mongo-express:
+    container_name: mongo-express
+    image: mongo-express
+    depends_on:
+      - mongo
+ #  healthcheck:
+ #     test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+ #     interval: 10s
+ #     timeout: 5s
+ #     retries: 3
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+      ME_CONFIG_BASICAUTH_USERNAME: root #: ${DB_USERNAME}
+      ME_CONFIG_BASICAUTH_PASSWORD: password #: ${DB_PASSWORD}
+    networks:
+      - os-frontend-net-dc
+      - os-backend-net-dc
+    restart: always
+
+  proxy:
+    container_name: proxy
+    image: nginx
+    depends_on:
+      - os-app-svc-dc
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl/group99shop.com.crt:/etc/ssl/certs/group99shop.com.crt
+      - ./ssl/group99shop.com.key:/etc/ssl/private/group99shop.com.key
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - os-frontend-net-dc
+    restart: always
+
+volumes:
+  mongodata:
+  appdata:
+
+networks:
+  os-frontend-net-dc:
+  os-backend-net-dc:
+    internal: true
